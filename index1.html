@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Analisis Penjualan E-Commerce Kab/Kota</title>
+
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <style>
+        body { font-family: 'Segoe UI', Arial, sans-serif; margin: 0; padding: 0; }
+        header { background: #1a252f; color: white; text-align: center; padding: 15px; }
+        #map { height: 85vh; width: 100%; }
+        .legend { 
+            background: white; padding: 10px; line-height: 18px; 
+            border-radius: 8px; box-shadow: 0 0 15px rgba(0,0,0,0.2); 
+        }
+        .legend i { width: 16px; height: 16px; float: left; margin-right: 8px; border-radius: 50%; opacity: 0.8; }
+    </style>
+</head>
+<body>
+
+<header>
+    <h2 style="margin:0;">Dashboard Penjualan E-Commerce</h2>
+    <p style="margin:5px 0 0;">Visualisasi Berdasarkan Centroid Kabupaten/Kota</p>
+</header>
+
+<div id="map"></div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/papaparse@5.3.0/papaparse.min.js"></script>
+
+<script>
+    // 3. Inisialisasi Peta Indonesia
+    var map = L.map('map').setView([-2.5, 118], 5);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; OpenStreetMap contributors'
+    }).addTo(map);
+
+    // 4. Fungsi Menentukan Warna Berdasarkan Total Pembayaran
+    function getColor(d) {
+        return d > 10000000 ? '#800026' : // > 10 Juta
+               d > 5000000  ? '#BD0026' : // > 5 Juta
+               d > 1000000  ? '#E31A1C' : // > 1 Juta
+               d > 500000   ? '#FC4E2A' : // > 500 Ribu
+                              '#FD8D3C';   // < 500 Ribu
+    }
+
+    // 5. Membaca File CSV Anda
+    Papa.parse("ecommerce_kabkota_centroid.csv", {
+        download: true,
+        header: true,
+        complete: function(results) {
+            results.data.forEach(function(row) {
+                // Mengambil kolom sesuai gambar CSV Anda: lat, lon, total_pembayaran, KAB_KOTA
+                if(row.lat && row.lon && row.total_pembayaran) {
+                    var lat = parseFloat(row.lat);
+                    var lon = parseFloat(row.lon);
+                    var penjualan = parseFloat(row.total_pembayaran);
+                    var namaLokasi = row.KAB_KOTA || "Tidak Diketahui";
+
+                    // Membuat Marker Lingkaran
+                    // Ukuran lingkaran dihitung dari akar penjualan agar tidak terlalu raksasa
+                    var radiusSize = Math.sqrt(penjualan) * 0.02; 
+
+                    L.circleMarker([lat, lon], {
+                        radius: radiusSize < 5 ? 5 : radiusSize, // Minimal radius 5 agar tetap terlihat
+                        fillColor: getColor(penjualan),
+                        color: "#fff",
+                        weight: 1,
+                        opacity: 1,
+                        fillOpacity: 0.7
+                    })
+                    .bindPopup(
+                        "<b>" + namaLokasi + "</b><br>" +
+                        "Provinsi: " + row.PROVINSI + "<br>" +
+                        "Total Pembayaran: Rp " + penjualan.toLocaleString('id-ID')
+                    )
+                    .addTo(map);
+                }
+            });
+        }
+    });
+
+    // 6. Menambahkan Legenda Warna
+    var legend = L.control({position: 'bottomright'});
+    legend.onAdd = function (map) {
+        var div = L.DomUtil.create('div', 'legend'),
+            grades = [0, 500000, 1000000, 5000000, 10000000];
+        div.innerHTML += '<h4>Total Pembayaran</h4>';
+        for (var i = 0; i < grades.length; i++) {
+            div.innerHTML +=
+                '<i style="background:' + getColor(grades[i] + 1) + '"></i> ' +
+                'Rp ' + grades[i].toLocaleString('id-ID') + (grades[i + 1] ? ' &ndash; ' + grades[i + 1].toLocaleString('id-ID') + '<br>' : '+');
+        }
+        return div;
+    };
+    legend.addTo(map);
+
+</script>
+</body>
+</html>
